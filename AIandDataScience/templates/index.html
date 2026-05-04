@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Fake News Detector</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+
+  *{margin:0;padding:0;box-sizing:border-box}
+  :root{
+    --bg:#0a0a0f;--surface:#12121a;--card:#1a1a27;--border:#2a2a3d;
+    --accent:#7c3aed;--accent2:#a855f7;--fake:#ef4444;--real:#22c55e;
+    --text:#f1f0ff;--muted:#888aaa;--warn:#f59e0b;
+  }
+  body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;
+    background-image:radial-gradient(ellipse 80% 60% at 50% -10%,#3b0764 0%,transparent 60%)}
+
+  /* BANNER */
+  .banner{background:linear-gradient(90deg,#78350f,#92400e);border-bottom:1px solid #a16207;
+    padding:.6rem 1.2rem;text-align:center;font-size:.82rem;display:none}
+  .banner.show{display:block}
+
+  /* HEADER */
+  header{text-align:center;padding:3.5rem 1rem 2rem}
+  .logo{font-size:2.6rem;font-weight:800;letter-spacing:-1px;
+    background:linear-gradient(135deg,#a855f7,#7c3aed,#6366f1);
+    -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+  header p{color:var(--muted);margin-top:.5rem;font-size:1rem}
+
+  /* MAIN CARD */
+  .container{max-width:780px;margin:0 auto;padding:0 1rem 4rem}
+  .card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:2rem;
+    backdrop-filter:blur(12px)}
+
+  textarea{width:100%;min-height:160px;background:var(--surface);border:1px solid var(--border);
+    border-radius:10px;color:var(--text);font-family:'Inter',sans-serif;font-size:.95rem;
+    padding:1rem;resize:vertical;transition:border .2s;outline:none}
+  textarea:focus{border-color:var(--accent)}
+  textarea::placeholder{color:var(--muted)}
+
+  .row{display:flex;align-items:center;justify-content:space-between;margin-top:.8rem;gap:1rem;flex-wrap:wrap}
+  .char-count{font-size:.78rem;color:var(--muted)}
+  
+  button#analyzeBtn{
+    background:linear-gradient(135deg,var(--accent),var(--accent2));
+    color:#fff;border:none;border-radius:10px;padding:.85rem 2.4rem;
+    font-size:1rem;font-weight:600;cursor:pointer;
+    transition:transform .15s,box-shadow .15s;box-shadow:0 4px 20px #7c3aed44}
+  button#analyzeBtn:hover{transform:translateY(-2px);box-shadow:0 8px 28px #7c3aed55}
+  button#analyzeBtn:active{transform:translateY(0)}
+  button#analyzeBtn:disabled{opacity:.5;cursor:not-allowed;transform:none}
+
+  /* SPINNER */
+  .spinner{width:20px;height:20px;border:2px solid #ffffff44;border-top-color:#fff;
+    border-radius:50%;animation:spin .7s linear infinite;display:inline-block;vertical-align:middle;margin-right:8px}
+  @keyframes spin{to{transform:rotate(360deg)}}
+
+  /* RESULT */
+  #result{margin-top:2rem;display:none}
+  #result.show{display:block}
+
+  .verdict{text-align:center;padding:1.5rem;border-radius:12px;margin-bottom:1.5rem;
+    border:1px solid transparent;transition:all .4s}
+  .verdict.fake{background:#ef444415;border-color:#ef444440}
+  .verdict.real{background:#22c55e15;border-color:#22c55e40}
+  .verdict-label{font-size:2.8rem;font-weight:800;letter-spacing:2px}
+  .verdict.fake .verdict-label{color:var(--fake)}
+  .verdict.real .verdict-label{color:var(--real)}
+  .verdict-sub{font-size:.9rem;color:var(--muted);margin-top:.3rem}
+
+  /* GAUGE */
+  .gauge-wrap{display:flex;flex-direction:column;align-items:center;margin-bottom:1.5rem}
+  .gauge-title{font-size:.8rem;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:.8rem}
+  .gauge{position:relative;width:180px;height:90px;overflow:hidden}
+  .gauge svg{width:180px;height:180px;transform:rotate(180deg)}
+  .gauge-bg{fill:none;stroke:var(--border);stroke-width:16;stroke-linecap:round}
+  .gauge-fill{fill:none;stroke-width:16;stroke-linecap:round;
+    stroke-dasharray:283;stroke-dashoffset:283;transition:stroke-dashoffset 1s cubic-bezier(.4,0,.2,1),stroke .4s}
+  .gauge-val{position:absolute;bottom:0;left:50%;transform:translateX(-50%);
+    font-size:1.8rem;font-weight:700;white-space:nowrap}
+  .gauge-labels{display:flex;justify-content:space-between;width:180px;
+    font-size:.7rem;color:var(--muted);margin-top:.2rem}
+
+  /* METRIC BARS */
+  .metrics{display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1.2rem}
+  @media(max-width:520px){.metrics{grid-template-columns:1fr}}
+  .metric{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:1rem}
+  .metric-head{display:flex;justify-content:space-between;margin-bottom:.5rem}
+  .metric-name{font-size:.78rem;color:var(--muted);text-transform:uppercase;letter-spacing:.5px}
+  .metric-val{font-size:.9rem;font-weight:700}
+  .bar-track{background:var(--border);border-radius:99px;height:6px;overflow:hidden}
+  .bar-fill{height:100%;border-radius:99px;width:0;transition:width 1s cubic-bezier(.4,0,.2,1)}
+  .bar-fake{background:linear-gradient(90deg,#ef4444,#f87171)}
+  .bar-real{background:linear-gradient(90deg,#22c55e,#4ade80)}
+  .bar-conf{background:linear-gradient(90deg,var(--accent),var(--accent2))}
+
+  /* LOGIT INFO */
+  .logit-info{text-align:center;font-size:.82rem;color:var(--muted);padding-top:.6rem;border-top:1px solid var(--border)}
+  .logit-info span{color:var(--text);font-weight:600}
+
+  /* ERROR */
+  .error-box{background:#ef444415;border:1px solid #ef444440;border-radius:10px;
+    padding:1rem;color:#fca5a5;font-size:.9rem;margin-top:1rem;display:none}
+  .error-box.show{display:block}
+</style>
+</head>
+<body>
+
+<div class="banner" id="hubBanner">
+  ⚠️ Fine-tuned ağırlıklar bulunamadı — temel <strong>distilroberta-base</strong> modeli kullanılıyor.
+  Tahminler anlamlı olmayabilir. Eğitilmiş model ağırlıklarını <code>./fake_news_model/</code> dizinine ekleyin.
+</div>
+
+<header>
+  <div class="logo">🔍 FakeGuard</div>
+  <p>Haber metninizi yapay zeka ile analiz edin — gerçek mi, sahte mi?</p>
+</header>
+
+<div class="container">
+  <div class="card">
+    <textarea id="inputText" placeholder="Haber başlığını veya metnini buraya yapıştırın…"></textarea>
+    <div class="row">
+      <span class="char-count" id="charCount">0 karakter</span>
+      <button id="analyzeBtn" onclick="analyze()">Analiz Et</button>
+    </div>
+    <div class="error-box" id="errorBox"></div>
+  </div>
+
+  <div id="result">
+    <div style="height:1.5rem"></div>
+    <div class="card">
+      <!-- Verdict -->
+      <div class="verdict" id="verdict">
+        <div class="verdict-label" id="verdictLabel"></div>
+        <div class="verdict-sub" id="verdictSub"></div>
+      </div>
+
+      <!-- Gauge -->
+      <div class="gauge-wrap">
+        <div class="gauge-title">Sahte Haber Skoru</div>
+        <div class="gauge">
+          <svg viewBox="0 0 100 100">
+            <path class="gauge-bg" d="M10,50 a40,40 0 0,1 80,0"/>
+            <path class="gauge-fill" id="gaugeFill" d="M10,50 a40,40 0 0,1 80,0"/>
+          </svg>
+          <div class="gauge-val" id="gaugeVal">0%</div>
+        </div>
+        <div class="gauge-labels"><span>Gerçek</span><span>Sahte</span></div>
+      </div>
+
+      <!-- Metric bars -->
+      <div class="metrics">
+        <div class="metric">
+          <div class="metric-head">
+            <span class="metric-name">🔴 Sahte Olasılığı</span>
+            <span class="metric-val" id="probFakeVal">-</span>
+          </div>
+          <div class="bar-track"><div class="bar-fill bar-fake" id="barFake"></div></div>
+        </div>
+        <div class="metric">
+          <div class="metric-head">
+            <span class="metric-name">🟢 Gerçek Olasılığı</span>
+            <span class="metric-val" id="probRealVal">-</span>
+          </div>
+          <div class="bar-track"><div class="bar-fill bar-real" id="barReal"></div></div>
+        </div>
+        <div class="metric">
+          <div class="metric-head">
+            <span class="metric-name">📊 Güven Skoru</span>
+            <span class="metric-val" id="confVal">-</span>
+          </div>
+          <div class="bar-track"><div class="bar-fill bar-conf" id="barConf"></div></div>
+        </div>
+        <div class="metric" style="display:flex;flex-direction:column;justify-content:center">
+          <div class="metric-name" style="margin-bottom:.4rem">⚡ Ham Logit</div>
+          <div style="font-size:1.5rem;font-weight:700" id="logitDisplay">-</div>
+          <div style="font-size:.72rem;color:var(--muted);margin-top:.2rem">σ(logit) → olasılık</div>
+        </div>
+      </div>
+
+      <div class="logit-info">
+        Model: <span id="modelSrc">-</span> &nbsp;|&nbsp;
+        Eşik: <span>0.50</span> &nbsp;|&nbsp;
+        Mimarisi: <span>distilroberta-base</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  // Show hub warning if model_source == "hub"
+  const modelSrcServer = "{{ model_source }}";
+  if(modelSrcServer === "hub") document.getElementById("hubBanner").classList.add("show");
+
+  // Char counter
+  const ta = document.getElementById("inputText");
+  ta.addEventListener("input", () => {
+    document.getElementById("charCount").textContent = ta.value.length + " karakter";
+  });
+
+  // Enter = submit (Shift+Enter = newline)
+  ta.addEventListener("keydown", e => {
+    if(e.key === "Enter" && !e.shiftKey){ e.preventDefault(); analyze(); }
+  });
+
+  async function analyze(){
+    const text = ta.value.trim();
+    const btn  = document.getElementById("analyzeBtn");
+    const errBox = document.getElementById("errorBox");
+
+    errBox.classList.remove("show");
+    if(!text){ showError("Lütfen bir metin girin."); return; }
+
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span> Analiz ediliyor…';
+
+    try{
+      const res = await fetch("/predict",{
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({text})
+      });
+      const data = await res.json();
+      if(!res.ok){ showError(data.error || "Sunucu hatası."); return; }
+      showResult(data);
+    }catch(e){
+      showError("Sunucuya bağlanılamadı. Flask'ın çalıştığından emin olun.");
+    }finally{
+      btn.disabled = false;
+      btn.innerHTML = "Analiz Et";
+    }
+  }
+
+  function showError(msg){
+    const box = document.getElementById("errorBox");
+    box.textContent = "⚠️ " + msg;
+    box.classList.add("show");
+    document.getElementById("result").classList.remove("show");
+  }
+
+  function showResult(d){
+    const isFake = d.label === "FAKE";
+
+    // Verdict
+    const verdict = document.getElementById("verdict");
+    verdict.className = "verdict " + (isFake ? "fake" : "real");
+    document.getElementById("verdictLabel").textContent = isFake ? "SAHTE HABER" : "GERÇEK HABER";
+    document.getElementById("verdictSub").textContent =
+      `%${(d.confidence * 100).toFixed(1)} güvenle ${isFake ? "sahte" : "gerçek"} olarak sınıflandırıldı`;
+
+    // Gauge — arc: 283 px total half-circle circumference
+    const pct = d.probability_fake;
+    const offset = 283 - (283 * pct);
+    const fill = document.getElementById("gaugeFill");
+    fill.style.strokeDashoffset = offset;
+    fill.style.stroke = isFake
+      ? `hsl(${0 + (1-pct)*20},90%,55%)`
+      : `hsl(${120 + pct*20},70%,50%)`;
+    document.getElementById("gaugeVal").textContent = Math.round(pct*100) + "%";
+    document.getElementById("gaugeVal").style.color = isFake ? "#ef4444" : "#22c55e";
+
+    // Bars
+    const pf = (d.probability_fake * 100).toFixed(1);
+    const pr = (d.probability_real * 100).toFixed(1);
+    const pc = (d.confidence * 100).toFixed(1);
+    document.getElementById("probFakeVal").textContent = pf + "%";
+    document.getElementById("probRealVal").textContent = pr + "%";
+    document.getElementById("confVal").textContent = pc + "%";
+    setTimeout(()=>{
+      document.getElementById("barFake").style.width = pf + "%";
+      document.getElementById("barReal").style.width = pr + "%";
+      document.getElementById("barConf").style.width = pc + "%";
+    }, 50);
+
+    // Logit
+    document.getElementById("logitDisplay").textContent = d.logit.toFixed(4);
+    document.getElementById("logitDisplay").style.color = isFake ? "#ef4444" : "#22c55e";
+
+    // Model source
+    document.getElementById("modelSrc").textContent =
+      d.model_source === "local" ? "Fine-tuned (local)" : "Base model (hub)";
+
+    document.getElementById("result").classList.add("show");
+    document.getElementById("result").scrollIntoView({behavior:"smooth",block:"nearest"});
+  }
+</script>
+</body>
+</html>
